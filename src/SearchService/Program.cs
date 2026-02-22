@@ -1,6 +1,10 @@
 using MongoDB.Driver;
 using MongoDB.Entities;
+using Polly;
+using Polly.Extensions.Http;
 using SearchService.Data;
+using SearchService.Services;
+using System.Net;
 
 
 
@@ -9,6 +13,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 
 builder.Services.AddControllers();
+builder.Services.AddHttpClient<AuctionSvcHttpClient>()
+    .AddPolicyHandler(GetRetryPolicy());
 
 var app = builder.Build();
 
@@ -21,14 +27,27 @@ app.UseAuthorization();
 app.MapControllers();
 
 
-try
+
+app.Lifetime.ApplicationStarted.Register(async () =>
 {
-    await DbInitializer.InitDb(app);
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"Error initializing database: {ex.Message}");
-}
+    try
+    {
+        await DbInitializer.InitDb(app);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error initializing database: {ex.Message}");
+    }
+});
+
+app.Run();
 
 
 app.Run();
+static IAsyncPolicy<HttpResponseMessage> GetRetryPolicy()
+{
+    return HttpPolicyExtensions
+        .HandleTransientHttpError()
+        .OrResult(msg => msg.StatusCode == HttpStatusCode.NotFound)
+        .WaitAndRetryForeverAsync(_ => TimeSpan.FromSeconds(3));
+}
