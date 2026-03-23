@@ -1,9 +1,12 @@
-﻿using MongoDB.Entities;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
 
-namespace SearchService.Models
+namespace Contracts
 {
-    public class Item : Entity
+    public class AuctionCreated
     {
+        public Guid Id { get; set; }
         public int ReservePrice { get; set; }
         public required string Seller { get; set; }
         public string? Winner { get; set; }
@@ -19,12 +22,5 @@ namespace SearchService.Models
         public required string Color { get; set; }
         public int Mileage { get; set; }
         public required string ImageUrl { get; set; }
-
-        // Provide a concrete SaveAsync so consumers can persist the Item using MongoDB.Entities
-        // This forwards to the library's DB.SaveAsync implementation.
-        public Task SaveAsync()
-        {
-            return DB.Default.SaveAsync(this);
-        }
     }
 }
