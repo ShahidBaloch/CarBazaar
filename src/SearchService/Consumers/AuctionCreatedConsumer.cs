@@ -19,6 +19,7 @@ namespace SearchService.Consumers
         {
             Console.WriteLine("__ Consuming Auction Created" + context.Message.Id);
             var item = _mapper.Map<Item>(context.Message);
+            if (item.Model == "Foo") throw new ArgumentException("Cant sell cars with model Foo");
             await item.SaveAsync();
         }
     }

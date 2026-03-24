@@ -11,46 +11,42 @@ namespace SearchService.Controllers
     [ApiController]
     public class SearchController : ControllerBase
     {
-
         public async Task<ActionResult> SearchItems([FromQuery] SearchParams searchParams)
         {
             var query = DB.Instance().PagedSearch<Item, Item>();
 
-            if (!string.IsNullOrEmpty(searchParams.SearchTerm))
+            // 1. MUST MATCH FIRST
+            bool isFullTextSearch = !string.IsNullOrEmpty(searchParams.SearchTerm);
+            if (isFullTextSearch)
             {
-                query.Match(Search.Full, searchParams.SearchTerm).SortByTextScore();
+                query.Match(Search.Full, searchParams.SearchTerm);
             }
 
-            // 1️⃣ Handle sorting (with deterministic tie-breaker)
-            query = searchParams.OrderBy switch
-            {
-                "make" => query.Sort(x => x.Ascending(a => a.Make)),
-                "new" => query.Sort(x => x.Descending(a => a.CreatedAt)),
-                _ => query.Sort(x => x.Ascending(a => a.AuctionEnd))
-            };
- 
-
-            if (!string.IsNullOrEmpty(searchParams.SearchTerm))
-            {
-                query.Match(Search.Full, searchParams.SearchTerm)
-                     .SortByTextScore();
-            }
-
-            // Optional seller filter
+            // 2. FILTERS
             if (!string.IsNullOrEmpty(searchParams.Seller))
-            {
                 query.Match(x => x.Seller == searchParams.Seller);
-            }
 
-            // Optional winner filter
             if (!string.IsNullOrEmpty(searchParams.Winner))
-            {
                 query.Match(x => x.Winner == searchParams.Winner);
-            }
 
+            // 3. SORTING (The Fix)
+            // Only call SortByTextScore if a Match(Search.Full) actually happened.
+            if (isFullTextSearch && string.IsNullOrEmpty(searchParams.OrderBy))
+            {
+                query.SortByTextScore();
+            }
+            else
+            {
+                query = searchParams.OrderBy switch
+                {
+                    "make" => query.Sort(x => x.Ascending(a => a.Make)),
+                    "new" => query.Sort(x => x.Descending(a => a.CreatedAt)),
+                    _ => query.Sort(x => x.Ascending(a => a.AuctionEnd))
+                };
+            }
 
             query.PageNumber(searchParams.PageNumber > 0 ? searchParams.PageNumber : 1);
-            query.PageSize(searchParams.PageSize > 0 ? searchParams.PageSize : 10);
+            query.PageSize(searchParams.PageSize > 0 ? searchParams.PageSize : 4);
 
             var result = await query.ExecuteAsync();
 
@@ -58,10 +54,9 @@ namespace SearchService.Controllers
             {
                 results = result.Results,
                 pageCount = result.PageCount,
-                totalCount = result.TotalCount,
+                totalCount = result.TotalCount
             });
         }
-      
 
 
         //[HttpGet]

@@ -5,6 +5,7 @@ using AutoMapper;
 using AutoMapper.QueryableExtensions;
 using Contracts;
 using MassTransit;
+using MassTransit.Transports;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
@@ -64,10 +65,11 @@ namespace AuctionService.Controllers
             auction.Seller = "test";
 
             _context.Auctions.Add(auction);
-            var result = await _context.SaveChangesAsync() > 0;
-
             var newAuction = _mapper.Map<AuctionDto>(auction);
             await _publishEndpoint.Publish(_mapper.Map<AuctionCreated>(newAuction));
+            var result = await _context.SaveChangesAsync() > 0;
+
+
 
             if (!result)
             {
@@ -96,6 +98,7 @@ namespace AuctionService.Controllers
             auction.Item.Year = auctionDto.Year;
             auction.Item.Color = auctionDto.Color ?? auction.Item.Color;
             auction.Item.Mileage = auctionDto.Mileage;
+            await _publishEndpoint.Publish(_mapper.Map<AuctionUpdated>(auction));
 
             var result = await _context.SaveChangesAsync() > 0;
 
@@ -118,6 +121,7 @@ namespace AuctionService.Controllers
 
             // TODO: check seller is the same as current user
             _context.Auctions.Remove(auction);
+            await _publishEndpoint.Publish<AuctionDeleted>(new { Id = auction.Id.ToString() });
             var result = await _context.SaveChangesAsync() > 0;
             if (!result)
             {
